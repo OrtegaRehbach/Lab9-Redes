@@ -14,7 +14,7 @@ consumer = KafkaConsumer(
     topic,
     group_id=group_id,
     bootstrap_servers=[kafka_server],
-    value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+    #value_deserializer=lambda x: json.loads(x.decode('utf-8')),
     auto_offset_reset='earliest',  # Para consumir mensajes desde el principio
     enable_auto_commit=False
 )
@@ -32,6 +32,25 @@ all_wind = deque(maxlen=100)
 # # Configurar gráficos en vivo
 plt.ion()  # Habilita el modo interactivo de matplotlib
 fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(8, 6))
+
+def decode_data(encoded_message):
+    payload = int.from_bytes(encoded_message, 'big')
+    temp_encoded = (payload >> 10) & 0x3FFF
+    hum_encoded = (payload >> 3) & 0x7F
+    wind_encoded = payload & 0x7
+    
+    # Decodificar valores
+    temperatura = temp_encoded * 110 / (2**14 - 1)
+    humedad = hum_encoded
+    wind_directions = {0: 'N', 1: 'NO', 2: 'O', 3: 'SO', 4: 'S', 5: 'SE', 6: 'E', 7: 'NE'}
+    direccion_viento = wind_directions[wind_encoded]
+    
+    return {
+        "temperatura": round(temperatura, 2),
+        "humedad": humedad,
+        "direccion_viento": direccion_viento
+    }
+
 
 # Función para actualizar el gráfico
 def actualizar_grafico():
@@ -60,7 +79,8 @@ def actualizar_grafico():
 # Recuperar mensajes anteriores
 print("Recuperando historial...")
 for mensaje in consumer:
-    payload = mensaje.value
+    #payload = mensaje.value
+    payload = decode_data(mensaje.value)
     
     all_temp.append(payload['temperatura'])
     all_hume.append(payload['humedad'])
@@ -76,11 +96,14 @@ try:
     print("Recibiendo mensajes...")
     for mensaje in consumer:
         # Imprimir el mensaje
-        print ("%s:%d:%d: key=%s value=%s" % (mensaje.topic, mensaje.partition,
-                                              mensaje.offset, mensaje.key, mensaje.value))
+        #print ("%s:%d:%d: key=%s value=%s" % (mensaje.topic, mensaje.partition,
+        #                                      mensaje.offset, mensaje.key, mensaje.value))
         
         # Procesar el mensaje y actualizar listas de datos
-        payload = mensaje.value
+        #payload = mensaje.value
+        payload = decode_data(mensaje.value)
+
+        print(f"Recibido: {payload}")
         
         all_temp.append(payload['temperatura'])
         all_hume.append(payload['humedad'])
